@@ -8,15 +8,6 @@ from gymnasium.utils.ezpickle import EzPickle
 
 from gymnasium_robotics.envs.fetch import MujocoFetchEnv, goal_distance
 
-# for VIP reward.
-import cv2
-from PIL import Image  
-import torch
-import torchvision.transforms as T
-from vip import load_vip
-import torch
-from copy import deepcopy
-
 # Ensure we get the path separator correct on windows
 MODEL_XML_PATH = os.path.join("fetch", "blind_pick.xml")
 
@@ -241,79 +232,6 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
     def close(self):
         pass
 
-
-class VIPRewardBlindPick(FetchBlindPickEnv):
-
-    def __init__(self, image_keys, goal_img_paths, aggregation='mean', device='cpu', **kwargs):
-
-        super().__init__(**kwargs)
-        # update observation space dict to have a `log_success` key.
-        self.observation_space.spaces['log_success'] = spaces.Box(-np.inf, np.inf, dtype="float32")
-
-        self.image_keys = image_keys
-        assert len(image_keys) > 0
-        assert len(goal_img_paths) == len(image_keys) # currently assumes 1:1 mapping between image keys to goal images, but can be 1:N.
-
-        self.vip_model = load_vip()
-        self.vip_transform = T.Compose([T.Resize(256),
-                        T.CenterCrop(224),
-                        T.ToTensor()])
-        self.aggregation = aggregation
-        self.device = device
-        # store the goal embedding.
-        self.goal_embeddings = {}
-        for image_key, goal_path in zip(image_keys, goal_img_paths):
-            directory_path = os.path.dirname(__file__)
-            path = os.path.join(directory_path, goal_path)
-            img = cv2.imread(path) # BGR format.
-            # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            img_cur = self.vip_transform(Image.fromarray(img)).unsqueeze(0)
-            with torch.no_grad():
-                embedding = self.vip_model(img_cur.to(self.device))
-                self.goal_embeddings[image_key] = embedding.cpu().numpy()
-
-    def reset(self, **kwargs): 
-        obs, info = super().reset(**kwargs)
-        obs["log_success"] = 0.0
-        return obs, info
-
-    def step(self, action):
-        obs, reward, term, trunc, info = super().step(action)
-        reward_per_image = {}
-        for k in obs.keys():
-            if k not in self.image_keys:
-                continue
-            img = cv2.cvtColor(deepcopy(obs[k]), cv2.COLOR_RGB2BGR)
-            img_cur = self.vip_transform(Image.fromarray(img.astype(np.uint8))).unsqueeze(0)
-            with torch.no_grad():
-                embeddings = self.vip_model(img_cur.to(self.device))
-                embeddings = embeddings.cpu().numpy()
-            distance = np.linalg.norm(embeddings - self.goal_embeddings[k])
-            reward_per_image[k] = -distance
-            # update info with reward per image
-            info[f'{k}_reward'] = reward_per_image[k]
-
-
-        if self.aggregation == 'mean':
-            final_reward = np.mean(list(reward_per_image.values()))
-        elif self.aggregation == 'max':
-            final_reward = np.max(list(reward_per_image.values()))
-        elif self.aggregation == 'min':
-            final_reward = np.min(list(reward_per_image.values()))
-
-        # give bonus if gripper is closed around block and in the correct position.
-        gripper_offset = np.array([0.03, 0, 0.02])
-        term = False
-        success = False
-        if obs["touch"].all() and np.linalg.norm(self.goal - (obs["robot_state"][:3] + gripper_offset)) < 0.05:
-            final_reward += 100000
-            term = True
-            success = True
-        obs["log_success"] = float(success)
-        return obs, final_reward, term, trunc, info
-
-
-
 if __name__ == "__main__":
     # import omegaconf
     # import hydra
@@ -347,10 +265,8 @@ if __name__ == "__main__":
     # print(embedding.shape) # [1, 1024]
 
     import imageio
-    cam_keys = ["camera_side", "camera_front", "gripper_camera_rgb"]
-    # env = FetchBlindPickEnv(cam_keys, "dense", render_mode="rgb_array", width=32, height=32, obj_range=0.001)
-    env = VIPRewardBlindPick(image_keys=["camera_front"], goal_img_paths=["./blindpick_final_camera_front.png"], device='cpu',  camera_names=cam_keys, reward_type="dense", render_mode="rgb_array", width=32, height=32, obj_range=0.001)
-    import ipdb; ipdb.set_trace()
+    cam_keys = ["camera_front", "camera_front_2"]
+    env = FetchBlindPickEnv(cam_keys, "dense", render_mode="depth_array", width=32, height=32, obj_range=0.001)
 
     # imgs = []
     # obs, _ = env.reset()

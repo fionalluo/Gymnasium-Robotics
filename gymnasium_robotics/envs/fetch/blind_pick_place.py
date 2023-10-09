@@ -275,8 +275,19 @@ class FetchBlindPickPlaceEnv(MujocoFetchEnv, EzPickle):
 if __name__ == "__main__":
     import imageio
     cam_keys = ["camera_side","camera_front", "gripper_camera_rgb"]
-    env = FetchBlindPickPlaceEnv(cam_keys, "dense_v4", render_mode="human", width=64, height=64, obj_range=0.01, bin_range=0.01)
+    env = FetchBlindPickPlaceEnv(cam_keys, "dense", render_mode="human", width=150, height=150, obj_range=0.07, bin_range=0.05)
+    env.reset()
+    while True:
+        env.render()
 
+    for i in range(10): 
+        obs, _ = env.reset()
+        for k,v in obs.items():
+            if k in cam_keys:
+                # save image with imageio
+                imageio.imwrite(f"{k}_{i}.png", v)
+    import sys
+    sys.exit()
     imgs = []
     for _ in range(1):
         env.reset()

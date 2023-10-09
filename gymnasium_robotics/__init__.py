@@ -1647,25 +1647,6 @@ def register_robotics_envs():
                 },
             )
 
-    for observation_mode in ["FO", "PO"]:
-        for reward_mode in ["MultiImage", "SingleImage"]:
-            for difficulty in [0.07]:
-                register(
-                    id=f"{observation_mode}{reward_mode}VIPBlind{int(difficulty*100)}cmPick-v0",
-                    entry_point="gymnasium_robotics.envs.fetch.blind_pick:VIPRewardBlindPick",
-                    max_episode_steps=100,
-                    disable_env_checker=True,
-                    kwargs={
-                        "image_keys": ["camera_front"] if "SingleImage" else ["camera_front", "camera_side", "gripper_camera_rgb"],
-                        "goal_img_paths": ["./blindpick_final_camera_front.png"] if "SingleImage" else ["./blindpick_final_camera_front.png", "./blindpick_final_camera_side.png", "./blindpick_final_gripper_camera_rgb.png"],
-                        "camera_names": ["camera_front", "camera_side", "gripper_camera_rgb"] if "FO" in observation_mode else None,
-                        "width": 32,
-                        "height": 32,
-                        "render_mode": "rgb_array",
-                        "obj_range": difficulty,
-                    },
-                )
-
     # ------ HORA 32x32 Fixed/Gripper Camera -> 2D Blind Pick ------
     register(
         id=f"HORABlind7cmPick-v0",
