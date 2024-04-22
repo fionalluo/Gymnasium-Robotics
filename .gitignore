@@ -6,6 +6,7 @@
 .pytest_cache/
 videos/
 test.mp4
+logdir
 
 # Setuptools distribution and build folders.
 /dist/
