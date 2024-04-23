@@ -1593,6 +1593,15 @@ def register_robotics_envs():
             "include_obj_state": True,
         },
     )
+    register(
+        id=f"ClutterSearch2x2StateEasyReset-v0",
+        entry_point="gymnasium_robotics.envs.fetch.clutter_search:FetchClutterSearchEnv",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "include_obj_state": True,
+        },
+    )
 
     # ------ Gripper Camera -> 2D Blind Pick ------
     for observation_mode in ["FO", "PO", "DepthFO", "DepthPO"]:

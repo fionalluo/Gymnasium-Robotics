@@ -66,7 +66,7 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
         _obs_space["touch"] = spaces.Box(-np.inf, np.inf, shape=(2,), dtype="float32")
         self.include_obj_state = include_obj_state
         if include_obj_state:
-            _obs_space["obj_state"] = spaces.Box(-np.inf, np.inf, shape=(3,), dtype="float32")
+            _obs_space["obj_state"] = spaces.Box(-np.inf, np.inf, shape=(3 * 5,), dtype="float32")
 
         self.observation_space = spaces.Dict(_obs_space)
         EzPickle.__init__(self, camera_names=camera_names, image_size=32, reward_type=reward_type, **kwargs)
@@ -88,11 +88,20 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
             self.np_random.shuffle(all_corners)
             for i, corner_xy in enumerate(all_corners):
                 if i == 0: # set the target object
+                    if self.np_random.uniform() < 0.5:
+                        # put object0 underneath object1
+                        obj0_z = 0.415
+                        obj1_z = 0.44
+                    else:
+                        obj0_z = 0.435
+                        obj1_z = 0.41
+
                     object_qpos = self._utils.get_joint_qpos(
                         self.model, self.data, f"object0:joint"
                     )
-                    object_qpos[:2] = corner_xy
-                    object_qpos[2] = 0.415
+                    # add some noise to obj0 xy.
+                    object_qpos[:2] = corner_xy + self.np_random.uniform(-0.015, 0.015, size=2)
+                    object_qpos[2] = obj0_z
                     object_qpos[3:] = [1, 0, 0, 0]
                     self._utils.set_joint_qpos(
                         self.model, self.data, f"object0:joint", object_qpos
@@ -101,7 +110,7 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
                         self.model, self.data, f"object1:joint"
                     )
                     object_qpos[:2] = corner_xy
-                    object_qpos[2] = 0.44
+                    object_qpos[2] = obj1_z
                     object_qpos[3:] = [1, 0, 0, 0]
                     self._utils.set_joint_qpos(
                         self.model, self.data, f"object1:joint", object_qpos
@@ -182,8 +191,11 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
             
             obs["robot_state"] = np.concatenate([grip_pos, grip_velp, gripper_state, gripper_vel]).astype(np.float32)
             if self.include_obj_state:
-                obj0_pos = self._utils.get_site_xpos(self.model, self.data, "object0").copy()
-                obs["obj_state"] = obj0_pos.astype(np.float32)
+                all_pos = []
+                for i in range(5):
+                    obj_pos = self._utils.get_site_xpos(self.model, self.data, f"object{i}").copy()
+                    all_pos.append(obj_pos)
+                obs["obj_state"] = np.concatenate(all_pos).astype(np.float32)
 
         else:
             # BaseRobotEnv has called _get_obs to determine observation space dims but mujoco renderer has not been initialized yet.
@@ -273,10 +285,14 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
 if __name__ == "__main__":
     import imageio
     cam_keys = ["camera_under", "camera_front"]
-    env = FetchClutterSearchEnv(cam_keys, "dense", render_mode="rgb_array", width=32, height=32, obj_range=0.001, include_obj_state=True)
-    while True:
+    cam_keys = None
+    env = FetchClutterSearchEnv(cam_keys, "dense", render_mode="human", width=128, height=128, obj_range=0.001, include_obj_state=True)
+    gif = []
+    for i in range(100000000):
         obs, _ = env.reset()
         import ipdb; ipdb.set_trace()
-        imageio.imwrite("test.png", obs["camera_front"])   
-        for i in range(100):
-            env.step(env.action_space.sample())
+        # gif.append(obs["camera_front"])   
+        # for i in range(10):
+        #     obs, rew, term, trunc, info = env.step(env.action_space.sample())
+            # gif.append(obs["camera_front"])   
+    # imageio.mimwrite("test.gif", gif, fps=10)
