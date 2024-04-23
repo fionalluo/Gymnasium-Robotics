@@ -15,7 +15,7 @@ MODEL_XML_PATH = os.path.join("fetch", "clutter_search.xml")
 class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
     metadata = {"render_modes": ["rgb_array", "depth_array"], 'render_fps': 25}
     render_mode = "rgb_array"
-    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, include_obj_state=False, **kwargs):
+    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, include_obj_state=False, easy_reset_percentage=0, **kwargs):
         initial_qpos = {
             "robot0:slide0": 0.405,
             "robot0:slide1": 0.48,
@@ -33,6 +33,8 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
         self.workspace_min = workspace_min
         self.workspace_max = workspace_max
         self.initial_qpos = initial_qpos
+        self.easy_reset_percentage = easy_reset_percentage
+
         MujocoFetchEnv.__init__(
             self,
             model_path=MODEL_XML_PATH,
@@ -84,11 +86,19 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
 
         # Randomize start position of object.
         if self.has_object:
-            all_corners = [[1.2, 0.85], [1.2, 0.65], [1.4, 0.85], [1.4, 0.65]]
+            # all_corners = [[1.2, 0.85], [1.2, 0.65], [1.4, 0.85], [1.4, 0.65]]
+            dx = 0.03
+            dy = 0.03
+            origin = [1.35, 0.75]
+            all_corners = []
+            for x_sign in [-1, 1]:
+                for y_sign in [-1, 1]:
+                    all_corners.append([origin[0] + x_sign * dx, origin[1] + y_sign * dy])
+
             self.np_random.shuffle(all_corners)
             for i, corner_xy in enumerate(all_corners):
                 if i == 0: # set the target object
-                    if self.np_random.uniform() < 0.5:
+                    if self.np_random.uniform() > self.easy_reset_percentage:
                         # put object0 underneath object1
                         obj0_z = 0.415
                         obj1_z = 0.44
@@ -100,7 +110,7 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
                         self.model, self.data, f"object0:joint"
                     )
                     # add some noise to obj0 xy.
-                    object_qpos[:2] = corner_xy + self.np_random.uniform(-0.015, 0.015, size=2)
+                    object_qpos[:2] = corner_xy 
                     object_qpos[2] = obj0_z
                     object_qpos[3:] = [1, 0, 0, 0]
                     self._utils.set_joint_qpos(
@@ -286,11 +296,11 @@ if __name__ == "__main__":
     import imageio
     cam_keys = ["camera_under", "camera_front"]
     cam_keys = None
-    env = FetchClutterSearchEnv(cam_keys, "dense", render_mode="human", width=128, height=128, obj_range=0.001, include_obj_state=True)
+    env = FetchClutterSearchEnv(cam_keys, "dense", render_mode="human", width=128, height=128, obj_range=0.001, include_obj_state=True, easy_reset_percentage=1.0)
     gif = []
     for i in range(100000000):
         obs, _ = env.reset()
-        import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
         # gif.append(obs["camera_front"])   
         # for i in range(10):
         #     obs, rew, term, trunc, info = env.step(env.action_space.sample())
