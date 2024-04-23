@@ -15,7 +15,7 @@ MODEL_XML_PATH = os.path.join("fetch", "blind_pick.xml")
 class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
     metadata = {"render_modes": ["rgb_array", "depth_array"], 'render_fps': 25}
     render_mode = "rgb_array"
-    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, include_obj_state=False, **kwargs):
+    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, include_obj_state=False, model_path=MODEL_XML_PATH, **kwargs):
         initial_qpos = {
             "robot0:slide0": 0.405,
             "robot0:slide1": 0.48,
@@ -31,7 +31,7 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
         self.initial_qpos = initial_qpos
         MujocoFetchEnv.__init__(
             self,
-            model_path=MODEL_XML_PATH,
+            model_path=model_path,
             has_object=True,
             block_gripper=False,
             n_substeps=20,
