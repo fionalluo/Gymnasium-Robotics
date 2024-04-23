@@ -1600,6 +1600,7 @@ def register_robotics_envs():
         disable_env_checker=True,
         kwargs={
             "include_obj_state": True,
+            "easy_reset_percentage": 1.0
         },
     )
 
