@@ -1718,6 +1718,22 @@ def register_robotics_envs():
         },
     )
 
+    # ----- Single Block Clutter Search ---- #
+    register(
+        id=f"SingleClutterSearch0.1cm-v0",
+        entry_point="gymnasium_robotics.envs.fetch.single_clutter_search:SingleClutterSearch",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "camera_names": ["camera_front"],
+            "width": 64,
+            "height": 64,
+            "render_mode": "rgb_array",
+            "include_obj_state": True,
+            "obj_range": 0.001,
+        },
+    )
+
     # ------ Pick and Place, State sanity check ------
     register(
         id=f"State7cmPick5cmPlace-v0",
