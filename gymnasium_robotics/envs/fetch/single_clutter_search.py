@@ -1,5 +1,5 @@
 from pathlib import Path
-from .blind_pick import FetchBlindPickEnv
+from gymnasium_robotics.envs.fetch.blind_pick import FetchBlindPickEnv
 
 MODEL_PATH = Path(__file__).parent.parent.resolve() / 'assets' / 'fetch' / 'single_clutter_search.xml'
 assert MODEL_PATH.exists(), f'Model path: {MODEL_PATH} does not exist'
@@ -20,4 +20,6 @@ class SingleClutterSearch(FetchBlindPickEnv):
 
 
 if __name__ == '__main__':
-    env = SingleClutterSearch()
+    env = SingleClutterSearch(render_mode='human', obj_range=0.05)
+    while True:
+        env.reset()
