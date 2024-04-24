@@ -80,13 +80,15 @@ class KnockAndPickPolicy:
     def _get_target_pos(self, obs):
         if self.state == PickPolicyState.GOTO:
             if not self.has_knocked:
-                return self.start_obj_state + np.array([0.0,-0.13,0.03], dtype=np.float32)  # some are on other side of object
+                mult = 1 if self.start_obj_state[1] <= self.goal[1] else -1
+                return self.start_obj_state + np.array([0.0, mult*0.13, 0.03], dtype=np.float32)  # some are on other side of object
             elif not self.has_grasped:
                 return obs['obj_state']
             else:
                 return self.goal
         elif self.state == PickPolicyState.KNOCK:
-            return self.start_obj_state + np.array([0.0,0.08,0.03], dtype=np.float32)  # some are on other side of object
+            mult = 1 if self.start_obj_state[1] <= self.goal[1] else -1
+            return self.start_obj_state + np.array([0.0, -mult*0.08, 0.03], dtype=np.float32)  # some are on other side of object
         elif self.state == PickPolicyState.GRASP:
             return obs['robot_state'][:3]  # same position
 
@@ -112,7 +114,7 @@ if __name__ == '__main__':
             "width": 64,
             "height": 64,
             "include_obj_state": True,
-            "obj_range": 0.001,
+            "obj_range": 0.05,
         }
 
         controller = KnockAndPickPolicy(np.array([1.33, 0.75, 0.60]), vector_env=False, verbose=False)
@@ -133,7 +135,7 @@ if __name__ == '__main__':
         from dreamerv3.embodied.replay.log_replay_wrapper import FromGymnasiumLogReplayDriver
 
         collection_episodes = 500
-        logdir = Path('./logdir/single_clutter_search_demos')
+        logdir = Path('./logdir/single_clutter_search_5cm_demos')
         env_str = 'SingleClutterSearch0.1cm-v0'
 
         print(f'Collecting {collection_episodes} episodes...')
