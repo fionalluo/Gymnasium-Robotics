@@ -234,19 +234,20 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
             # print("success phase")
             reward = 300
         else:
-            dist = np.linalg.norm(curr_eef_state - obj0_pos)
-            reaching_reward = 1 - np.tanh(10.0 * dist)
-            reward += reaching_reward
-            # msg = "reaching phase"
+            if self.reward_type == "dense":
+                dist = np.linalg.norm(curr_eef_state - obj0_pos)
+                reaching_reward = 1 - np.tanh(10.0 * dist)
+                reward += reaching_reward
+                # msg = "reaching phase"
 
-            # grasping reward
-            if obs["touch"].all():
-                reward += 0.25
-                dist = np.linalg.norm(self.goal - obj0_pos)
-                picking_reward = 1 - np.tanh(10.0 * dist)
-                reward += picking_reward
-            #     msg = "picking phase"
-            # print(msg)
+                # grasping reward
+                if obs["touch"].all():
+                    reward += 0.25
+                    dist = np.linalg.norm(self.goal - obj0_pos)
+                    picking_reward = 1 - np.tanh(10.0 * dist)
+                    reward += picking_reward
+                #     msg = "picking phase"
+                # print(msg)
 
         return obs, reward, terminated, truncated, info
 

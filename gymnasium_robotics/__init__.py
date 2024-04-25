@@ -1594,6 +1594,20 @@ def register_robotics_envs():
         },
     )
     register(
+        id=f"ClutterSearch2x2Sparse-v0",
+        entry_point="gymnasium_robotics.envs.fetch.clutter_search:FetchClutterSearchEnv",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "camera_names": ["camera_under", "camera_front"],
+            "width": 64,
+            "height": 64,
+            "render_mode": "rgb_array",
+            "include_obj_state": True,
+            "reward_type": "sparse",
+        },
+    )
+    register(
         id=f"ClutterSearch2x2StateEasyReset-v0",
         entry_point="gymnasium_robotics.envs.fetch.clutter_search:FetchClutterSearchEnv",
         max_episode_steps=100,
@@ -1748,6 +1762,21 @@ def register_robotics_envs():
             "obj_range": 0.001,
         },
     )
+    register(
+        id=f"SingleClutterSearch0.1cmSparse-v0",
+        entry_point="gymnasium_robotics.envs.fetch.single_clutter_search:SingleClutterSearch",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "camera_names": ["camera_front"],
+            "width": 64,
+            "height": 64,
+            "render_mode": "rgb_array",
+            "include_obj_state": True,
+            "obj_range": 0.001,
+            "reward_type": "sparse",
+        },
+    )
 
     register(
         id=f"SingleClutterSearch5cm-v0",
@@ -1761,6 +1790,21 @@ def register_robotics_envs():
             "render_mode": "rgb_array",
             "include_obj_state": True,
             "obj_range": 0.05,
+        },
+    )
+    register(
+        id=f"SingleClutterSearch5cmSparse-v0",
+        entry_point="gymnasium_robotics.envs.fetch.single_clutter_search:SingleClutterSearch",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "camera_names": ["camera_front"],
+            "width": 64,
+            "height": 64,
+            "render_mode": "rgb_array",
+            "include_obj_state": True,
+            "obj_range": 0.05,
+            "reward_type": "sparse",
         },
     )
 
