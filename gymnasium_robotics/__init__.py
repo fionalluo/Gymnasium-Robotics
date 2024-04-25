@@ -1692,6 +1692,21 @@ def register_robotics_envs():
             "obj_range": 0.001,
         },
     )
+    register(
+        id=f"State2DBlind0.1cmPickSparse-v0",
+        entry_point="gymnasium_robotics.envs.fetch.blind_pick:FetchBlindPickEnv",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "camera_names": ["external_camera_0"],
+            "width": 64,
+            "height": 64,
+            "render_mode": "rgb_array",
+            "include_obj_state": True,
+            "obj_range": 0.001,
+            "reward_type": "sparse",
+        },
+    )
 
     # ------ Pick and Place, State sanity check ------
     register(
