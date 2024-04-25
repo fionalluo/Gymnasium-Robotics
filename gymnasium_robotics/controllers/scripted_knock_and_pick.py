@@ -37,7 +37,7 @@ class KnockAndPickPolicy:
     def advance_state(self, obs):
         single_env_obs = self._unpack_obs(obs)
         if self.start_obj_state is None:
-            self.start_obj_state = single_env_obs['obj_state']
+            self.start_obj_state = single_env_obs['obj_state'][:3]
         target_pos = self._get_target_pos(single_env_obs)
         if self._met_state_goal(target_pos, single_env_obs):
             self.state = self._get_next_state()  # Advance state if we met prior state's goal
@@ -83,7 +83,7 @@ class KnockAndPickPolicy:
                 mult = 1 if self.start_obj_state[1] <= self.goal[1] else -1
                 return self.start_obj_state + np.array([0.0, mult*0.13, 0.03], dtype=np.float32)  # some are on other side of object
             elif not self.has_grasped:
-                return obs['obj_state']
+                return obs['obj_state'][:3]
             else:
                 return self.goal
         elif self.state == PickPolicyState.KNOCK:
@@ -101,15 +101,19 @@ class KnockAndPickPolicy:
         }[self.state](goal_pos, obs)
 
 if __name__ == '__main__':
+    MULTI_OBJ_ENV = True
     TEST_CONTROLLER = False
     COLLECT_DATA = True
 
     if TEST_CONTROLLER:
         from gymnasium_robotics.envs.fetch.single_clutter_search import SingleClutterSearch
+        from gymnasium_robotics.envs.fetch.clutter_search import FetchClutterSearchEnv
+        
 
         eval_episodes = 3
         print(f'Testing Controller for {eval_episodes} episodes...')
         kwargs= {
+            "render_mode": "human",
             "camera_names": ["camera_front"],
             "width": 64,
             "height": 64,
@@ -118,7 +122,7 @@ if __name__ == '__main__':
         }
 
         controller = KnockAndPickPolicy(np.array([1.33, 0.75, 0.60]), vector_env=False, verbose=False)
-        env = SingleClutterSearch(render_mode="human", **kwargs)
+        env = FetchClutterSearchEnv(**kwargs) if MULTI_OBJ_ENV else SingleClutterSearch(**kwargs)
         for _ in range(eval_episodes):
             obs, _ = env.reset()
             controller.reset()
@@ -135,8 +139,8 @@ if __name__ == '__main__':
         from dreamerv3.embodied.replay.log_replay_wrapper import FromGymnasiumLogReplayDriver
 
         collection_episodes = 500
-        logdir = Path('./logdir/single_clutter_search_5cm_demos')
-        env_str = 'SingleClutterSearch0.1cm-v0'
+        logdir = Path('./logdir/multi_clutter_search_demos')
+        env_str = 'ClutterSearch2x2-v0' if MULTI_OBJ_ENV else 'SingleClutterSearch0.1cm-v0'
 
         print(f'Collecting {collection_episodes} episodes...')
         controller = KnockAndPickPolicy(np.array([1.33, 0.75, 0.60]), vector_env=True)
@@ -145,4 +149,3 @@ if __name__ == '__main__':
         driver = FromGymnasiumLogReplayDriver(env_str, dir=logdir, logger=logger, chunks=64, on_episode_fns=on_eps)
 
         driver.run(controller, steps=0, episodes=collection_episodes)
-

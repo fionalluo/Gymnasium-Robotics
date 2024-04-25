@@ -1587,8 +1587,8 @@ def register_robotics_envs():
         disable_env_checker=True,
         kwargs={
             "camera_names": ["camera_under", "camera_front"],
-            "width": 32,
-            "height": 32,
+            "width": 64,
+            "height": 64,
             "render_mode": "rgb_array",
             "include_obj_state": True,
         },
