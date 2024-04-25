@@ -1579,6 +1579,31 @@ def register_robotics_envs():
             },
         )
 
+    # ------ Clutter Search ------
+    register(
+        id=f"ClutterSearch2x2-v0",
+        entry_point="gymnasium_robotics.envs.fetch.clutter_search:FetchClutterSearchEnv",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "camera_names": ["camera_under", "camera_front"],
+            "width": 64,
+            "height": 64,
+            "render_mode": "rgb_array",
+            "include_obj_state": True,
+        },
+    )
+    register(
+        id=f"ClutterSearch2x2StateEasyReset-v0",
+        entry_point="gymnasium_robotics.envs.fetch.clutter_search:FetchClutterSearchEnv",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "include_obj_state": True,
+            "easy_reset_percentage": 1.0
+        },
+    )
+
     # ------ Gripper Camera -> 2D Blind Pick ------
     for observation_mode in ["FO", "PO", "DepthFO", "DepthPO"]:
         for difficulty in [0.07, 0.15]:
@@ -1705,6 +1730,37 @@ def register_robotics_envs():
             "include_obj_state": True,
             "obj_range": 0.001,
             "reward_type": "sparse",
+        },
+    )
+
+    # ----- Single Block Clutter Search ---- #
+    register(
+        id=f"SingleClutterSearch0.1cm-v0",
+        entry_point="gymnasium_robotics.envs.fetch.single_clutter_search:SingleClutterSearch",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "camera_names": ["camera_front"],
+            "width": 64,
+            "height": 64,
+            "render_mode": "rgb_array",
+            "include_obj_state": True,
+            "obj_range": 0.001,
+        },
+    )
+
+    register(
+        id=f"SingleClutterSearch5cm-v0",
+        entry_point="gymnasium_robotics.envs.fetch.single_clutter_search:SingleClutterSearch",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "camera_names": ["camera_front"],
+            "width": 64,
+            "height": 64,
+            "render_mode": "rgb_array",
+            "include_obj_state": True,
+            "obj_range": 0.05,
         },
     )
 

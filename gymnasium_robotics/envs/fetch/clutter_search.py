@@ -9,18 +9,22 @@ from gymnasium.utils.ezpickle import EzPickle
 from gymnasium_robotics.envs.fetch import MujocoFetchEnv, goal_distance
 
 # Ensure we get the path separator correct on windows
-MODEL_XML_PATH = os.path.join("fetch", "blind_pick.xml")
+MODEL_XML_PATH = os.path.join("fetch", "clutter_search.xml")
 
 
-class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
+class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
     metadata = {"render_modes": ["rgb_array", "depth_array"], 'render_fps': 25}
     render_mode = "rgb_array"
-    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, include_obj_state=False, model_path=MODEL_XML_PATH, **kwargs):
+    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, include_obj_state=False, **kwargs):
         initial_qpos = {
             "robot0:slide0": 0.405,
             "robot0:slide1": 0.48,
             "robot0:slide2": 0.0,
-            'object0:joint': [1.33, 0.75, 0.42, 1., 0., 0., 0.],
+            'object0:joint': [1.33, 0.75, 0.42, 1., 0., 0., 0.], # object to find
+            'object1:joint': [1.33, 0.75, 0.45,  1., 0., 0., 0.], # distractor, always on top of object0
+            'object2:joint': [1.33, 0.75, 0.42, 1., 0., 0., 0.],
+            'object3:joint': [1.33, 0.75, 0.42, 1., 0., 0., 0.],
+            'object4:joint': [1.33, 0.75, 0.42, 1., 0., 0., 0.],
         }
         self.camera_names = camera_names if camera_names is not None else []
         workspace_min=np.array([1.1, 0.44, 0.42])
@@ -31,7 +35,7 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
         self.initial_qpos = initial_qpos
         MujocoFetchEnv.__init__(
             self,
-            model_path=model_path,
+            model_path=MODEL_XML_PATH,
             has_object=True,
             block_gripper=False,
             n_substeps=20,
@@ -74,29 +78,63 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
     def _reset_sim(self):
         self.data.time = self.initial_time
         self.data.qpos[:] = np.copy(self.initial_qpos)
-        self.data.qvel[:] = np.copy(self.initial_qvel)
+        self.data.qvel[:] = np.zeros_like(self.initial_qvel)
         if self.model.na != 0:
             self.data.act[:] = None
 
         # Randomize start position of object.
         if self.has_object:
-            object_xpos = [1.3, 0.75]
+            all_corners = [[1.2, 0.85], [1.2, 0.65], [1.4, 0.85], [1.4, 0.65]]
+            self.np_random.shuffle(all_corners)
+            for i, corner_xy in enumerate(all_corners):
+                if i == 0: # set the target object
+                    object_qpos = self._utils.get_joint_qpos(
+                        self.model, self.data, f"object0:joint"
+                    )
+                    object_qpos[:2] = corner_xy
+                    object_qpos[2] = 0.415
+                    object_qpos[3:] = [1, 0, 0, 0]
+                    self._utils.set_joint_qpos(
+                        self.model, self.data, f"object0:joint", object_qpos
+                    )
+                    object_qpos = self._utils.get_joint_qpos(
+                        self.model, self.data, f"object1:joint"
+                    )
+                    object_qpos[:2] = corner_xy
+                    object_qpos[2] = 0.44
+                    object_qpos[3:] = [1, 0, 0, 0]
+                    self._utils.set_joint_qpos(
+                        self.model, self.data, f"object1:joint", object_qpos
+                    )
+                    continue
+
+                object_qpos = self._utils.get_joint_qpos(
+                    self.model, self.data, f"object{i+1}:joint"
+                )
+                object_qpos[:2] = corner_xy
+                object_qpos[2] = 0.425
+                self._utils.set_joint_qpos(
+                    self.model, self.data, f"object{i+1}:joint", object_qpos
+                )
+
+
+            # object_xpos = [1.3, 0.75]
             # sample in a rectangular region and offset by a random amount
-            object_xpos[0] += self.np_random.uniform(-self.obj_range, self.obj_range)
-            y_offset = self.np_random.uniform(-self.obj_range, self.obj_range)
-            object_xpos[1] += y_offset
-            object_qpos = self._utils.get_joint_qpos(
-                self.model, self.data, "object0:joint"
-            )
-            assert object_qpos.shape == (7,)
-            object_qpos[:2] = object_xpos
-            self._utils.set_joint_qpos(
-                self.model, self.data, "object0:joint", object_qpos
-            )
+            # object_xpos[0] += self.np_random.uniform(-self.obj_range, self.obj_range)
+            # y_offset = self.np_random.uniform(-self.obj_range, self.obj_range)
+            # object_xpos[1] += y_offset
+            # object_qpos = self._utils.get_joint_qpos(
+            #     self.model, self.data, "object0:joint"
+            # )
+            # assert object_qpos.shape == (7,)
+            # object_qpos[:2] = object_xpos
+            # self._utils.set_joint_qpos(
+            #     self.model, self.data, "object0:joint", object_qpos
+            # )
 
         self._mujoco.mj_forward(self.model, self.data)
         return True
-    
+
     def _get_obs(self):
         obs = {}
         if hasattr(self, "mujoco_renderer"):
@@ -141,7 +179,7 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
             )
             gripper_state = robot_qpos[-2:]
             gripper_vel = robot_qvel[-2:] * dt # change to a scalar if the gripper is made symmetric
-            
+
             obs["robot_state"] = np.concatenate([grip_pos, grip_velp, gripper_state, gripper_vel]).astype(np.float32)
             if self.include_obj_state:
                 obj0_pos = self._utils.get_site_xpos(self.model, self.data, "object0").copy()
@@ -196,20 +234,19 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
             # print("success phase")
             reward = 300
         else:
-            if self.reward_type == "dense":
-                dist = np.linalg.norm(curr_eef_state - obj0_pos)
-                reaching_reward = 1 - np.tanh(10.0 * dist)
-                reward += reaching_reward
-                # msg = "reaching phase"
+            dist = np.linalg.norm(curr_eef_state - obj0_pos)
+            reaching_reward = 1 - np.tanh(10.0 * dist)
+            reward += reaching_reward
+            # msg = "reaching phase"
 
-                # grasping reward
-                if obs["touch"].all():
-                    reward += 0.25
-                    dist = np.linalg.norm(self.goal - obj0_pos)
-                    picking_reward = 1 - np.tanh(10.0 * dist)
-                    reward += picking_reward
-                #     msg = "picking phase"
-                # print(msg)
+            # grasping reward
+            if obs["touch"].all():
+                reward += 0.25
+                dist = np.linalg.norm(self.goal - obj0_pos)
+                picking_reward = 1 - np.tanh(10.0 * dist)
+                reward += picking_reward
+            #     msg = "picking phase"
+            # print(msg)
 
         return obs, reward, terminated, truncated, info
 
@@ -234,95 +271,12 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
         pass
 
 if __name__ == "__main__":
-    # import omegaconf
-    # import hydra
-    # import torch
-    # import torchvision.transforms as T
-    # import numpy as np
-    # from PIL import Image
-
-    # from vip import load_vip
-
-    # if torch.cuda.is_available():
-    #     device = "cuda"
-    # else:
-    #     device = "cpu"
-
-    # vip = load_vip()
-    # vip.eval()
-    # vip.to(device)
-
-    # ## DEFINE PREPROCESSING
-    # transforms = T.Compose([T.Resize(256),
-    #     T.CenterCrop(224),
-    #     T.ToTensor()]) # ToTensor() divides by 255
-
-    # ## ENCODE IMAGE
-    # image = np.random.randint(0, 255, (500, 500, 3))
-    # preprocessed_image = transforms(Image.fromarray(image.astype(np.uint8))).reshape(-1, 3, 224, 224)
-    # preprocessed_image.to(device) 
-    # with torch.no_grad():
-    #     embedding = vip(preprocessed_image * 255.0) ## vip expects image input to be [0-255]
-    # print(embedding.shape) # [1, 1024]
-
     import imageio
-    cam_keys = ["camera_front", "camera_front_2"]
-    env = FetchBlindPickEnv(cam_keys, "dense", render_mode="depth_array", width=32, height=32, obj_range=0.001)
-
-    # imgs = []
-    # obs, _ = env.reset()
-
-
-
-    # def process_depth(depth):
-    #     # depth -= depth.min()
-    #     # depth /= 2*depth[depth <= 1].mean()
-    #     # pixels = 255*np.clip(depth, 0, 1)
-    #     # pixels = pixels.astype(np.uint8)
-    #     # return pixels
-    #     return depth
-    # for _ in range(100):
-    #     obs,_ = env.reset()
-    #     imgs.append(np.concatenate([obs['camera_side'], obs['camera_front'], obs['gripper_camera_rgb']], axis=1))
-    #     # for i in range(10):
-    #     #     obs, *_ = env.step(env.action_space.sample())
-    #     #     imgs.append(np.concatenate([obs['camera_side'], obs['camera_front'], obs['gripper_camera_rgb']], axis=1))
-    # imageio.mimwrite("test.gif", imgs)
-    from collections import defaultdict
-    demo = defaultdict(list)
+    cam_keys = ["camera_under", "camera_front"]
+    env = FetchClutterSearchEnv(cam_keys, "dense", render_mode="rgb_array", width=32, height=32, obj_range=0.001, include_obj_state=True)
     while True:
         obs, _ = env.reset()
-        for k in obs.keys():
-            if k in cam_keys:
-                demo[k].append(obs[k])
-        # open the gripper and descend
-        for i in range(10):
-            obs, rew, term, trunc, info = env.step(np.array([-0.1, 0.0, -1, 1.0]))
-            for k in obs.keys():
-                if k in cam_keys:
-                    demo[k].append(obs[k])
-            # print(rew)
-        # close gripper
-        for i in range(10):
-            obs, rew, term, trunc, info= env.step(np.array([0,0,0.0,-1.0]))
-            for k in obs.keys():
-                if k in cam_keys:
-                    demo[k].append(obs[k])
-            print(rew)
-        # lift up cube
-        for i in range(10):
-            obs, rew, term, trunc, info = env.step(np.array([0,0,1.0,-1.0]))
-            for k in obs.keys():
-                if k in cam_keys:
-                    demo[k].append(obs[k])
-            print(rew)
-            if term:
-                # for k in cam_keys:
-                #     imageio.imwrite(f'blindpick_final_{k}.png', obs[k])
-                break
-
-    # save each key as a mp4 with imageio                
-    for k, v in demo.items():
-        imageio.mimwrite(f"{k}.mp4", v)
-
-    # import ipdb; ipdb.set_trace()
+        import ipdb; ipdb.set_trace()
+        imageio.imwrite("test.png", obs["camera_front"])   
+        for i in range(100):
+            env.step(env.action_space.sample())
