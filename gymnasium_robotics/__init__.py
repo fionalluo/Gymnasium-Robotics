@@ -1586,7 +1586,7 @@ def register_robotics_envs():
         max_episode_steps=100,
         disable_env_checker=True,
         kwargs={
-            "camera_names": ["camera_under", "camera_front"],
+            "camera_names": ["camera_under", "camera_front", "gripper_camera_rgb"],
             "width": 64,
             "height": 64,
             "render_mode": "rgb_array",
