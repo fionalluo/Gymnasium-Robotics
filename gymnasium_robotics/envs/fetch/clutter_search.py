@@ -15,7 +15,7 @@ MODEL_XML_PATH = os.path.join("fetch", "clutter_search.xml")
 class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
     metadata = {"render_modes": ["rgb_array", "depth_array"], 'render_fps': 25}
     render_mode = "rgb_array"
-    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, include_obj_state=False, **kwargs):
+    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.0, include_obj_state=False, **kwargs):
         initial_qpos = {
             "robot0:slide0": 0.405,
             "robot0:slide1": 0.48,
@@ -87,11 +87,12 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
             all_corners = [[1.2, 0.85], [1.2, 0.65], [1.4, 0.85], [1.4, 0.65]]
             self.np_random.shuffle(all_corners)
             for i, corner_xy in enumerate(all_corners):
+                xy_noise = self.np_random.uniform(-self.obj_range, self.obj_range, size=(2,))
                 if i == 0: # set the target object
                     object_qpos = self._utils.get_joint_qpos(
                         self.model, self.data, f"object0:joint"
                     )
-                    object_qpos[:2] = corner_xy
+                    object_qpos[:2] = corner_xy + xy_noise
                     object_qpos[2] = 0.415
                     object_qpos[3:] = [1, 0, 0, 0]
                     self._utils.set_joint_qpos(
@@ -100,7 +101,7 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
                     object_qpos = self._utils.get_joint_qpos(
                         self.model, self.data, f"object1:joint"
                     )
-                    object_qpos[:2] = corner_xy
+                    object_qpos[:2] = corner_xy + xy_noise
                     object_qpos[2] = 0.44
                     object_qpos[3:] = [1, 0, 0, 0]
                     self._utils.set_joint_qpos(
@@ -111,7 +112,7 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
                 object_qpos = self._utils.get_joint_qpos(
                     self.model, self.data, f"object{i+1}:joint"
                 )
-                object_qpos[:2] = corner_xy
+                object_qpos[:2] = corner_xy + xy_noise
                 object_qpos[2] = 0.425
                 self._utils.set_joint_qpos(
                     self.model, self.data, f"object{i+1}:joint", object_qpos

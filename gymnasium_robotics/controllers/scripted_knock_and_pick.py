@@ -95,8 +95,8 @@ class KnockAndPickPolicy:
 
     def _met_state_goal(self, goal_pos, obs):
         return {
-            PickPolicyState.GOTO: lambda goal_pos, obs : np.linalg.norm(goal_pos - obs['robot_state'][:3]) < 0.02,
-            PickPolicyState.KNOCK: lambda goal_pos, obs : np.linalg.norm(goal_pos - obs['robot_state'][:3]) < 0.02,
+            PickPolicyState.GOTO: lambda goal_pos, obs : np.linalg.norm(goal_pos - obs['robot_state'][:3]) < 0.01,
+            PickPolicyState.KNOCK: lambda goal_pos, obs : np.linalg.norm(goal_pos - obs['robot_state'][:3]) < 0.01,
             PickPolicyState.GRASP: lambda goal_pos, obs : obs['touch'].all()
         }[self.state](goal_pos, obs)
 
@@ -132,15 +132,14 @@ if __name__ == '__main__':
                 obs, _, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
 
-
     if COLLECT_DATA:
         from pathlib import Path
         import dreamerv3.embodied as embodied
         from dreamerv3.embodied.replay.log_replay_wrapper import FromGymnasiumLogReplayDriver
 
         collection_episodes = 500
-        logdir = Path('./logdir/multi_clutter_search_demos')
-        env_str = 'ClutterSearch2x2-v0' if MULTI_OBJ_ENV else 'SingleClutterSearch0.1cm-v0'
+        logdir = Path(f'./logdir/multi_clutter_search_5cm_demos_{collection_episodes}_eps')
+        env_str = 'ClutterSearch5cm2x2-v0' if MULTI_OBJ_ENV else 'SingleClutterSearch0.1cm-v0'
 
         print(f'Collecting {collection_episodes} episodes...')
         controller = KnockAndPickPolicy(np.array([1.33, 0.75, 0.60]), vector_env=True)
