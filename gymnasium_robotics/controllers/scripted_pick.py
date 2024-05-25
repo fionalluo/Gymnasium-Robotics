@@ -94,11 +94,10 @@ if __name__ == '__main__':
 
         collection_episodes = 500
         logdir = Path('./logdir/blind_pick_demos')
-        env_str = 'State2DBlind0.1cmPick-v0'
+        env_str = 'State2DBlind0.1cmPickSparse-v0'
 
         print(f'Collecting {collection_episodes} episodes...')
         controller = RandomPickPolicy(np.array([[1.33, 0.75, 0.60]]), vector_env=True)
         logger = embodied.Logger(embodied.Counter(), [embodied.logger.JSONLOutput(logdir, 'scores.jsonl', 'episode/score')])
         driver = FromGymnasiumLogReplayDriver(env_str, dir=logdir, logger=logger, chunks=64)
         driver.run(controller, steps=0, episodes=collection_episodes)
-

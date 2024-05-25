@@ -1,9 +1,8 @@
 import os
 
-import numpy as np
 import mujoco
-
-from gymnasium import spaces 
+import numpy as np
+from gymnasium import spaces
 from gymnasium.utils.ezpickle import EzPickle
 
 from gymnasium_robotics.envs.fetch import MujocoFetchEnv, goal_distance
@@ -231,7 +230,6 @@ class FetchClutterSearchEnv(MujocoFetchEnv, EzPickle):
         # success bonus
         reward = 0
         if terminated:
-            # print("success phase")
             reward = 300
         else:
             if self.reward_type == "dense":
