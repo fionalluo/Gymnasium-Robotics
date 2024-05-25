@@ -141,7 +141,6 @@ if __name__ == '__main__':
                 obs, _, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
 
-
     if COLLECT_DATA:
         from pathlib import Path
 

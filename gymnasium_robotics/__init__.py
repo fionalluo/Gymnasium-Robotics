@@ -1581,12 +1581,27 @@ def register_robotics_envs():
 
     # ------ Clutter Search ------
     register(
+        id=f"ClutterSearch5cm2x2-v0",
+        entry_point="gymnasium_robotics.envs.fetch.clutter_search:FetchClutterSearchEnv",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "camera_names": ["camera_under", "camera_front", "gripper_camera_rgb"],
+            "width": 64,
+            "height": 64,
+            "render_mode": "rgb_array",
+            "include_obj_state": True,
+            "obj_range": 0.05
+        },
+    )
+
+    register(
         id=f"ClutterSearch2x2-v0",
         entry_point="gymnasium_robotics.envs.fetch.clutter_search:FetchClutterSearchEnv",
         max_episode_steps=100,
         disable_env_checker=True,
         kwargs={
-            "camera_names": ["camera_under", "camera_front"],
+            "camera_names": ["camera_under", "camera_front", "gripper_camera_rgb"],
             "width": 64,
             "height": 64,
             "render_mode": "rgb_array",
