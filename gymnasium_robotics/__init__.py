@@ -1683,6 +1683,23 @@ def register_robotics_envs():
                     "obj_range": difficulty,
                 },
             )
+    
+    # ----- Privileged Reset, 2D Blind Pick -----
+    for max_episode_limit in [0, 50, 100, 250, 500, 800, 1000, 1000000]:
+        register(
+            id=f"BlindPickPrivilegedReset{max_episode_limit}-v0",
+            entry_point="gymnasium_robotics.envs.fetch.blind_pick:FetchBlindPickEnv",
+            max_episode_steps=100,
+            disable_env_checker=True,
+            kwargs={
+                "camera_names": ["camera_front", "camera_side", "gripper_camera_rgb"],
+                "width": 32,
+                "height": 32,
+                "render_mode": "rgb_array",
+                "obj_range": 0.07,
+                "max_episode_limit": max_episode_limit
+            },
+        )
 
     # ------ 32x32 Fixed/Gripper Camera -> 2D Blind Pick ------
     for observation_mode in ["FO", "PO"]:

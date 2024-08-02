@@ -15,7 +15,10 @@ MODEL_XML_PATH = os.path.join("fetch", "blind_pick.xml")
 class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
     metadata = {"render_modes": ["rgb_array", "depth_array"], 'render_fps': 25}
     render_mode = "rgb_array"
-    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, include_obj_state=False, model_path=MODEL_XML_PATH, **kwargs):
+    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, include_obj_state=False, 
+                 model_path=MODEL_XML_PATH, 
+                 max_episode_limit=None,
+                 **kwargs):
         initial_qpos = {
             "robot0:slide0": 0.405,
             "robot0:slide1": 0.48,
@@ -25,6 +28,12 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
         self.camera_names = camera_names if camera_names is not None else []
         workspace_min=np.array([1.1, 0.44, 0.42])
         workspace_max=np.array([1.5, 1.05, 0.7])
+        
+        self.episodes_so_far = 0
+        self.max_episode_limit = max_episode_limit
+        self.total_reward = 0
+        self.last_10_successes = []
+        self.curriculum = 0
 
         self.workspace_min = workspace_min
         self.workspace_max = workspace_max
@@ -211,19 +220,120 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
                 #     msg = "picking phase"
                 # print(msg)
 
+        self.total_reward += reward
         return obs, reward, terminated, truncated, info
-
+    
     def reset(
         self,
         *,
         seed = None,
         options = None,
-    ):
+    ):  
+        # def print_to_file(file_path, message):
+        #     with open(file_path, 'a') as file:
+        #         file.write(message + '\n')
+        
+        # message = f"In reset: max episode limit {self.episodes_so_far}/{self.max_episode_limit}"
+        # print_to_file('/home/harsh/fiona/dreamerv3/test_log.txt', message)
+
         # removed super.reset call
         did_reset_sim = False
         while not did_reset_sim:
             did_reset_sim = self._reset_sim()
         self.goal = self._sample_goal().copy()
+
+        # Check if we need to increase the curricula
+        self.last_10_successes.append(self.total_reward >= 300)
+        self.total_reward = 0
+        if len(self.last_10_successes) > 10:
+            self.last_10_successes = self.last_10_successes[1:]
+        if sum(self.last_10_successes) >= 9:
+            self.curriculum += 1
+
+        noise = 0.04
+
+        def open_gripper():
+            action = np.array([0.0, 0.0, 0.0, 1.0])
+            action = np.clip(action, self.action_space.low, self.action_space.high)
+            curr_eef_state = self._utils.get_site_xpos(self.model, self.data, 'robot0:grip')
+            next_eef_state = curr_eef_state + (action[:3] * 0.05)
+            next_eef_state = np.clip(next_eef_state, self.workspace_min, self.workspace_max)
+            clipped_ac = (next_eef_state - curr_eef_state) / 0.05
+            action[:3] = clipped_ac
+            self._set_action(action)
+            for _ in range(10):
+                self._mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
+        
+        def close_gripper():
+            action = np.array([0.0, 0.0, 0.0, -1.0])
+            action = np.clip(action, self.action_space.low, self.action_space.high)
+            curr_eef_state = self._utils.get_site_xpos(self.model, self.data, 'robot0:grip')
+            next_eef_state = curr_eef_state + (action[:3] * 0.05)
+            next_eef_state = np.clip(next_eef_state, self.workspace_min, self.workspace_max)
+            clipped_ac = (next_eef_state - curr_eef_state) / 0.05
+            action[:3] = clipped_ac
+            self._set_action(action)
+            for _ in range(10):
+                self._mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
+        
+        def move_above_cube():
+            gripper_target = self._utils.get_site_xpos(self.model, self.data, "object0") + np.array([0, 0, 0.1])
+            gripper_rotation = np.array([1.0, 0.0, 1.0, 0.0])
+            self._utils.set_mocap_pos(self.model, self.data, "robot0:mocap", gripper_target)
+            self._utils.set_mocap_quat(
+                self.model, self.data, "robot0:mocap", gripper_rotation
+            )
+            for _ in range(10):
+                self._mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
+        
+        def move_down():
+            lower_gripper_target = self._utils.get_site_xpos(self.model, self.data, 'robot0:grip') - np.array([0, 0, 0.1])
+            self._utils.set_mocap_pos(self.model, self.data, "robot0:mocap", lower_gripper_target)
+            for _ in range(10):
+                self._mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
+        
+        def move_to_goal(t: float = 1):
+            # Move the gripper a scaled distance toward the goal. Ratio = amount to move to goal
+            start_gripper_target = self._utils.get_site_xpos(self.model, self.data, "robot0:grip")
+            end_gripper_target = self.goal
+            gripper_target = start_gripper_target + t * (end_gripper_target - start_gripper_target)
+            self._utils.set_mocap_pos(self.model, self.data, "robot0:mocap", gripper_target)
+            for _ in range(10):
+                self._mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
+        
+        def move_to_cube(t: float = 1):
+            # Move the gripper a scaled distance toward the goal. Ratio = amount to move to goal
+            start_gripper_target = self._utils.get_site_xpos(self.model, self.data, "robot0:grip")
+            end_gripper_target = self._utils.get_site_xpos(self.model, self.data, "object0") + np.array([0, 0, 0.1])
+            gripper_target = start_gripper_target + t * (end_gripper_target - start_gripper_target)
+            self._utils.set_mocap_pos(self.model, self.data, "robot0:mocap", gripper_target)
+            for _ in range(10):
+                self._mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
+        
+        def add_noise(noise: float = 0.02):
+            gripper_target = self._utils.get_site_xpos(self.model, self.data, "robot0:grip")
+            gripper_target[0] += self.np_random.uniform(-noise, noise)
+            gripper_target[1] += self.np_random.uniform(-noise, noise)
+            gripper_rotation = np.array([1.0, 0.0, 1.0, 0.0])
+            self._utils.set_mocap_pos(self.model, self.data, "robot0:mocap", gripper_target)
+            self._utils.set_mocap_quat(
+                self.model, self.data, "robot0:mocap", gripper_rotation
+            )
+            for _ in range(10):
+                self._mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
+        
+        if self.max_episode_limit:
+            self.episodes_so_far += 1
+
+            t = self.episodes_so_far / self.max_episode_limit
+
+            move_to_cube(max(0, 1 - t))
+            add_noise(0.02)
+        
+        elif self.max_episode_limit == 0:
+            # Handle 0 case. None is NOT covered by case, so if None, fixed position WITHOUT noise
+            add_noise(0.02)
+        
         obs = self._get_obs()
         if self.render_mode == "human":
             self.render()
@@ -234,6 +344,19 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
         pass
 
 if __name__ == "__main__":
+    
+    kwargs= {
+        "camera_names": ["external_camera_0"],
+        "width": 64,
+        "height": 64,
+        "include_obj_state": True,
+        "obj_range": 0.8,
+        "max_episode_limit": 0,
+    }
+    env = FetchBlindPickEnv(render_mode="human", **kwargs)
+    while True:
+        env.reset()
+    
     # import omegaconf
     # import hydra
     # import torch
@@ -267,7 +390,9 @@ if __name__ == "__main__":
 
     import imageio
     cam_keys = ["camera_front", "camera_front_2"]
-    env = FetchBlindPickEnv(cam_keys, "dense", render_mode="depth_array", width=32, height=32, obj_range=0.001)
+    # env = FetchBlindPickEnv(cam_keys, "dense", render_mode="depth_array", width=32, height=32, obj_range=0.001)
+
+    env = FetchBlindPickEnv(render_mode="human", **kwargs)
 
     # imgs = []
     # obs, _ = env.reset()
