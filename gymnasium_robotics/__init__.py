@@ -1683,6 +1683,7 @@ def register_robotics_envs():
                     "obj_range": difficulty,
                 },
             )
+    # Ideal ID: FOFixedGripper2DBlind7cmPick-v0
     
     # ----- Privileged Reset, 2D Blind Pick -----
     for max_episode_limit in [0, 50, 100, 250, 500, 800, 1000, 1000000]:
@@ -1697,7 +1698,8 @@ def register_robotics_envs():
                 "height": 32,
                 "render_mode": "rgb_array",
                 "obj_range": 0.07,
-                "max_episode_limit": max_episode_limit
+                "max_episode_limit": max_episode_limit,
+                "include_obj_state": True,
             },
         )
 
@@ -1939,6 +1941,24 @@ def register_robotics_envs():
             "obj_range": 0.07,
         },
     )
+
+
+    # Pick and Place, Moving Camera / ACTIVE PERCEPTION
+    register(
+        id=f"HandToFixed7cmPick5cmPlaceCam-v0",
+        entry_point="gymnasium_robotics.envs.fetch.blind_pick_place_cam:FetchBlindPickPlaceCamEnv",
+        max_episode_steps=100,
+        disable_env_checker=True,
+        kwargs={
+            "camera_names": ["camera_front"],
+            "width": 64,
+            "height": 64,
+            "render_mode": "rgb_array",
+            "obj_range": 0.07,
+        },
+    )
+
+    # OTHER PICK PLACE ENVS
 
     for observation_mode in ["FO", "PO", "DepthFO", "DepthPO"]:
         register(

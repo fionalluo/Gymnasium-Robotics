@@ -90,9 +90,19 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
         # Randomize start position of object.
         if self.has_object:
             object_xpos = [1.3, 0.75]
+
+            # Add curriculum for object (linearly increase obj_range)
+            if self.max_episode_limit:
+                t = self.episodes_so_far / self.max_episode_limit
+                obj_range_curriculum = max(min(self.obj_range * t, self.obj_range), 0.025)
+            else:
+                obj_range_curriculum = self.obj_range
+
             # sample in a rectangular region and offset by a random amount
-            object_xpos[0] += self.np_random.uniform(-self.obj_range, self.obj_range)
-            y_offset = self.np_random.uniform(-self.obj_range, self.obj_range)
+            object_xpos[0] += self.np_random.uniform(-obj_range_curriculum, obj_range_curriculum)
+            y_offset = self.np_random.uniform(-obj_range_curriculum, obj_range_curriculum)
+            # object_xpos[0] += self.np_random.uniform(-self.obj_range, self.obj_range)
+            # y_offset = self.np_random.uniform(-self.obj_range, self.obj_range)
             object_xpos[1] += y_offset
             object_qpos = self._utils.get_joint_qpos(
                 self.model, self.data, "object0:joint"
@@ -323,11 +333,12 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
                 self._mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
         
         if self.max_episode_limit:
+            
             self.episodes_so_far += 1
 
-            t = self.episodes_so_far / self.max_episode_limit
+            # t = self.episodes_so_far / self.max_episode_limit
 
-            move_to_cube(max(0, 1 - t))
+            # move_to_cube(max(0, 1 - t))
             add_noise(0.02)
         
         elif self.max_episode_limit == 0:
@@ -350,8 +361,8 @@ if __name__ == "__main__":
         "width": 64,
         "height": 64,
         "include_obj_state": True,
-        "obj_range": 0.8,
-        "max_episode_limit": 0,
+        "obj_range": 0.07,
+        "max_episode_limit": 500,
     }
     env = FetchBlindPickEnv(render_mode="human", **kwargs)
     while True:

@@ -55,7 +55,8 @@
 			<camera mode="targetbody" target="arenacenter"  fovy="50" name="camera_side" ></camera>
 			<!-- <site name="camera_side_site" pos="0 0 0" size="0.05 0.05 0.05" rgba="1 1 1 1" type="sphere"></site> -->
 		</body>
-		<body name="camera_front" pos="1.8 0.75 0.60">
+		<!-- <body name="camera_front" pos="1.8 0.75 0.60"> -->
+		<body name="camera_front" pos="1.8 0.75 0.50">
 			<camera mode="targetbody" target="arenacenter"  fovy="50" name="camera_front" ></camera>
 			<!-- <site name="camera_front_site" pos="0 0 0" size="0.05 0.05 0.05" rgba="1 1 1 1" type="sphere"></site> -->
 		</body>

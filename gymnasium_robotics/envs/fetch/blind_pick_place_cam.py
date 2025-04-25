@@ -12,7 +12,7 @@ from gymnasium_robotics.envs.fetch import MujocoFetchEnv, goal_distance
 MODEL_XML_PATH = os.path.join("fetch", "blind_pick_place.xml")
 
 
-class FetchBlindPickPlaceEnv(MujocoFetchEnv, EzPickle):
+class FetchBlindPickPlaceCamEnv(MujocoFetchEnv, EzPickle):
     metadata = {"render_modes": ["rgb_array", "depth_array"], 'render_fps': 25}
     render_mode = "rgb_array"
     def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, bin_range=0.05, include_obj_state=False, include_bin_state=False, **kwargs):
@@ -75,6 +75,25 @@ class FetchBlindPickPlaceEnv(MujocoFetchEnv, EzPickle):
 
         self.observation_space = spaces.Dict(_obs_space)
         EzPickle.__init__(self, camera_names=camera_names, image_size=32, reward_type=reward_type, **kwargs)
+
+        print("INITIALIZED BLIND PICK PLACE ENV")
+        
+        # Override action space to be able to move camera
+        self.action_space = spaces.Box(-1.0, 1.0, shape=(5,), dtype=np.float32)
+        print("ACTION SPACE OVERRIDEN", self.action_space)
+
+        # Get initial radius/distance from front_camera to arena_center from the XML
+        self.initial_camera_pos = self.model.body_pos[self._mujoco.mj_name2id(self.model, self._mujoco.mjtObj.mjOBJ_BODY, "camera_front")]
+        self.arena_center = self.model.body_pos[self._mujoco.mj_name2id(self.model, self._mujoco.mjtObj.mjOBJ_BODY, "arenacenter")]
+        self.camera_radius = np.linalg.norm(self.initial_camera_pos - self.arena_center)
+        self.camera_angle = np.arctan2(
+            self.initial_camera_pos[2] - self.arena_center[2],
+            self.initial_camera_pos[0] - self.arena_center[0]
+        )
+        # print("Initial camera position:", self.initial_camera_pos)
+        # print("Arena center:", self.arena_center)
+        # print("Initial camera distance:", self.camera_radius)
+
 
     def _sample_goal(self):
         bin_xpos = self.bin_init_pos.copy()
@@ -170,6 +189,41 @@ class FetchBlindPickPlaceEnv(MujocoFetchEnv, EzPickle):
                 else np.zeros((self.height, self.width, 1), dtype=np.float32)
             obs["achieved_goal"] = obs["observation"] = img
         return obs
+    
+    def set_camera(self, angle):
+        # Angle from 0 to np.pi / 2 * 0.75 (full arc not allowed, since this will hit the robot)
+        angle = np.clip(angle, 0, np.pi / 2 * 0.75)  # Map from [0, 1] to [0, pi/2]
+        x_offset = self.camera_radius * np.cos(angle)
+        z_offset = self.camera_radius * np.sin(angle)
+        # Not sure why a divide by 2 is necessary??
+        self.model.body_pos[self._mujoco.mj_name2id(self.model, self._mujoco.mjtObj.mjOBJ_BODY, "camera_front")] = np.array([
+            (self.arena_center[0] + x_offset) / 2,
+            self.arena_center[1] / 2,
+            (self.arena_center[2] + z_offset) / 2
+        ])
+        self.model.cam_pos[self._mujoco.mj_name2id(self.model, self._mujoco.mjtObj.mjOBJ_CAMERA, "camera_front")] = np.array([
+            (self.arena_center[0] + x_offset) / 2,
+            self.arena_center[1] / 2,
+            (self.arena_center[2] + z_offset) / 2
+        ])
+        # print("X offset", x_offset, "Z offset", z_offset)
+        # print("Body position", self.model.body_pos[self._mujoco.mj_name2id(self.model, self._mujoco.mjtObj.mjOBJ_BODY, "camera_front")])
+        # print("Camera position", self.model.cam_pos[self._mujoco.mj_name2id(self.model, self._mujoco.mjtObj.mjOBJ_CAMERA, "camera_front")])
+        self._mujoco.mj_forward(self.model, self.data)
+
+        self.camera_angle = angle
+
+    def move_camera(self, dist):
+        # move the camera forward or backward with up or down speed (-1 to 1)
+
+        dist = np.clip(dist, -1, 1)  # clip distance to -1, 1
+        scaled_dist = dist * 0.08  # max distance is +/- 0.08 radians
+        self.set_camera(self.camera_angle + scaled_dist)
+
+        # if self.camera_angle >= np.pi / 2 * 0.75:
+        #     self.set_camera(self.camera_angle - 0.07)
+        # else:
+        #     self.set_camera(self.camera_angle + 0.07)
 
     def step(self, action):
         if np.array(action).shape != self.action_space.shape:
@@ -184,6 +238,11 @@ class FetchBlindPickPlaceEnv(MujocoFetchEnv, EzPickle):
         next_eef_state = np.clip(next_eef_state, self.workspace_min, self.workspace_max)
         clipped_ac = (next_eef_state - curr_eef_state) / 0.05
         action[:3] = clipped_ac
+
+        # Take out the camera movement action (last dimension), and only pass the first (4,) of (5,) to super class
+        camera_action = action[-1]
+        self.move_camera(camera_action)  # Update camera motion
+        action = action[:4]
 
         self._set_action(action)
 
@@ -275,10 +334,38 @@ class FetchBlindPickPlaceEnv(MujocoFetchEnv, EzPickle):
 if __name__ == "__main__":
     import imageio
     cam_keys = ["camera_side","camera_front", "gripper_camera_rgb"]
-    env = FetchBlindPickPlaceEnv(cam_keys, "dense", render_mode="human", width=64, height=64, obj_range=0.07, bin_range=0.05)
+    env = FetchBlindPickPlaceCamEnv(cam_keys, "dense", render_mode="human", width=150, height=150, obj_range=0.07, bin_range=0.05)
     env.reset()
     while True:
         env.render()
+        # env.step(env.action_space.sample())
+        env.step(np.array([0, 0, 0, 0, 1]))
+
+        import mujoco
+
+    
+    # import imageio
+    # from gymnasium.envs.mujoco import mujoco_rendering
+
+    # # MODEL_XML_PATH = "/Users/edward/projects/Gymnasium-Robotics/gymnasium_robotics/envs/assets/fetch/blind_pick_place.xml"
+    # MODEL_XML_PATH = "/Users/fionaluo/Documents/Research/projects/Gymnasium-Robotics/gymnasium_robotics/envs/assets/fetch/blind_pick_place.xml"
+
+    # model = mujoco.MjModel.from_xml_path(MODEL_XML_PATH)
+    # data = mujoco.MjData(model)
+    # mujoco.mj_forward(model, data)
+    # renderer = mujoco_rendering.MujocoRenderer(model, data)
+    # image = renderer.render("rgb_array", camera_name="camera_front")
+    # imageio.imwrite('test.png', image) 
+    # # change the camera position
+    # model.cam('camera_front').pos = np.array([0, 0, 10.0])  
+    # mujoco.mj_forward(model, data)
+    # image = renderer.render("rgb_array", camera_name="camera_front")
+    # imageio.imwrite('test2.png', image) 
+
+    # import ipdb; ipdb.set_trace()
+
+    # while True:
+    #     pass
 
     for i in range(10): 
         obs, _ = env.reset()
