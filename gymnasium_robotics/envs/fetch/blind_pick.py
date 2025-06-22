@@ -1,3 +1,33 @@
+"""
+This script defines the FetchBlindPick environment.
+
+The task is for the Fetch robot to pick up a cube from a table and lift it to a target position in the air.
+The robot may not have a camera providing a direct view of the object,
+and instead must rely on proprioception and touch sensors. The starting position of the cube is randomized
+in a rectangular region on the table.
+
+Observation Space:
+The observation is a dictionary with the following keys:
+- `robot_state`: (10,) numpy array containing gripper position, velocity, and joint states.
+- `touch`: (2,) numpy array representing boolean touch sensor data for the left and right fingers.
+- `<camera_name>` (optional): (H, W, 3) numpy array for RGB image from a camera, if specified.
+    Can be: gripper_camera_rgb, camera_front, camera_side
+- `obj_state` (optional): (3,) numpy array for the object's position.
+
+Action Space:
+The action space is a (4,) numpy array:
+- action[0]: Change in gripper's x position.
+- action[1]: Change in gripper's y position.
+- action[2]: Change in gripper's z position.
+- action[3]: Gripper open/close state.
+
+Rewards:
+The environment provides a dense reward structure:
+- Reaching reward: Based on the distance between the gripper and the cube.
+- Grasping reward: A bonus for making contact with the cube with both fingers.
+- Picking reward: Based on the distance between the grasped cube and the goal position.
+A large success bonus is given when the cube reaches the goal.
+"""
 import os
 
 import numpy as np
