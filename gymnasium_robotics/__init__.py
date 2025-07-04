@@ -3,7 +3,26 @@ from gymnasium.envs.registration import register
 
 from gymnasium_robotics.core import GoalEnv
 from gymnasium_robotics.envs.maze import maps
-from gymnasium_robotics.envs.multiagent_mujoco import mamujoco_v0
+
+# The multi-agent MuJoCo environments require additional Gymnasium wrappers
+# that might not be available in older Gymnasium versions. We import them
+# defensively so that the rest of the package (e.g. single-agent Fetch/BlindPick
+# tasks) still works even if the dependencies are missing.
+try:
+    from gymnasium_robotics.envs.multiagent_mujoco import mamujoco_v0  # type: ignore
+except ModuleNotFoundError as _e:  # pragma: no cover
+    # Log once for visibility but continue – these envs are optional.
+    import warnings
+
+    warnings.warn(
+        (
+            "gymnasium_robotics: multiagent_mujoco could not be imported (" + str(_e) + "). "
+            "If you need these environments, please install a newer version of Gymnasium "
+            "or the additional dependencies."
+        ),
+        ImportWarning,
+    )
+    mamujoco_v0 = None  # type: ignore
 
 
 def register_robotics_envs():
@@ -1635,9 +1654,12 @@ def register_robotics_envs():
 
     # ------ Gripper Camera -> 2D Blind Pick ------
     for observation_mode in ["FO", "PO", "DepthFO", "DepthPO"]:
-        for difficulty in [0.07, 0.15]:
+        for difficulty in [0.03, 0.07, 0.15]:
+
+            env_id= f"{observation_mode}Gripper2DBlind{int(difficulty*100)}cmPick-v0"
+            print(f"Registering {env_id}")
             register(
-                id=f"{observation_mode}Gripper2DBlind{int(difficulty*100)}cmPick-v0",
+                id=env_id,
                 entry_point="gymnasium_robotics.envs.fetch.blind_pick:FetchBlindPickEnv",
                 max_episode_steps=100,
                 disable_env_checker=True,
@@ -1652,7 +1674,7 @@ def register_robotics_envs():
 
     # ------ Under/Gripper Camera -> 2D Blind Pick ------
     for observation_mode in ["FO", "PO"]:
-        for difficulty in [0.07, 0.15]:
+        for difficulty in [0.03, 0.07, 0.15]:
             register(
                 id=f"{observation_mode}UnderGripper2DBlind{int(difficulty*100)}cmPick-v0",
                 entry_point="gymnasium_robotics.envs.fetch.blind_pick:FetchBlindPickEnv",
@@ -1669,7 +1691,7 @@ def register_robotics_envs():
 
     # ------ Fixed/Gripper Camera -> 2D Blind Pick ------
     for observation_mode in ["FO", "PO"]:
-        for difficulty in [0.07, 0.15]:
+        for difficulty in [0.03, 0.07, 0.15]:
             register(
                 id=f"{observation_mode}FixedGripper2DBlind{int(difficulty*100)}cmPick-v0",
                 entry_point="gymnasium_robotics.envs.fetch.blind_pick:FetchBlindPickEnv",
@@ -2008,16 +2030,12 @@ def register_robotics_envs():
 
 __version__ = "1.2.1"
 
+# ---------------------------------------------------------------------------
+# Automatically register all Gymnasium-Robotics environments when the package
+# is imported. This makes the custom IDs (e.g. BlindPick, OccludedPickPlace)
+# immediately available via `gymnasium.make()` after a simple
+# `pip install -e .`, without requiring client code to call
+# `gymnasium_robotics.register_robotics_envs()` manually.
+# ---------------------------------------------------------------------------
 
-try:
-    import sys
-
-    from farama_notifications import notifications
-
-    if (
-        "gymnasium_robotics" in notifications
-        and __version__ in notifications["gymnasium_robotics"]
-    ):
-        print(notifications["gymnasium_robotics"][__version__], file=sys.stderr)
-except Exception:  # nosec
-    pass
+register_robotics_envs()  # noqa: F405  (function defined above)

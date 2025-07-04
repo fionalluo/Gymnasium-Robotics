@@ -4,7 +4,9 @@ This script defines the FetchBlindPick environment.
 The task is for the Fetch robot to pick up a cube from a table and lift it to a target position in the air.
 The robot may not have a camera providing a direct view of the object,
 and instead must rely on proprioception and touch sensors. The starting position of the cube is randomized
-in a rectangular region on the table.
+in a rectangular region on the table. 
+`obj_range` is the maximum distance from the center of the region that the cube can be placed. Higher values of `obj_range`
+mean a more difficult task.
 
 Observation Space:
 The observation is a dictionary with the following keys:
@@ -45,7 +47,9 @@ MODEL_XML_PATH = os.path.join("fetch", "blind_pick.xml")
 class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
     metadata = {"render_modes": ["rgb_array", "depth_array"], 'render_fps': 25}
     render_mode = "rgb_array"
-    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, include_obj_state=False, 
+    def __init__(self, camera_names=None, reward_type="dense", obj_range=0.07, 
+                #  include_obj_state=False, 
+                 include_obj_state=True, 
                  model_path=MODEL_XML_PATH, 
                  max_episode_limit=None,
                  **kwargs):
@@ -84,6 +88,7 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
             reward_type=reward_type,
             **kwargs,
         )
+        print("reward_type:", reward_type)
         self.cube_body_id = self._mujoco.mj_name2id(
             self.model, self._mujoco.mjtObj.mjOBJ_BODY, "object0"
         )
@@ -151,7 +156,22 @@ class FetchBlindPickEnv(MujocoFetchEnv, EzPickle):
         if hasattr(self, "mujoco_renderer"):
             self._render_callback()
             for c in self.camera_names:
-                img = self.mujoco_renderer.render(self.render_mode, camera_name=c)
+                # New Gymnasium MujocoRenderer.render() no longer accepts a
+                # `camera_name` argument; instead the camera is selected via
+                # the `camera_id` attribute set on the renderer prior to
+                # calling `render`. Convert our desired camera *name* to an
+                # integer ID and assign it before rendering.
+
+                try:
+                    cam_id = self._mujoco.mj_name2id(
+                        self.model, self._mujoco.mjtObj.mjOBJ_CAMERA, c
+                    )
+                except Exception:
+                    cam_id = -1  # fallback to default track camera
+
+                # Update renderer to use this camera ID, then render.
+                self.mujoco_renderer.camera_id = cam_id
+                img = self.mujoco_renderer.render(self.render_mode)
                 obs[c] = img[:,:,None] if self.render_mode == 'depth_array' else img
 
             touch_left_finger = False
